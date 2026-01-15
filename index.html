@@ -16,7 +16,6 @@ html, body {
   font-family: Inter, system-ui, sans-serif;
 }
 
-/* ===== SPRITE CONTAINER ===== */
 .sprite {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -24,18 +23,15 @@ html, body {
   image-rendering: pixelated;
 }
 
-/* ===== SPRITE IMAGE ===== */
 .sprite img {
   height: 64px;
   transform-origin: center;
 }
 
-/* flip ONLY the image */
 .sprite.flip img {
   transform: scaleX(-1);
 }
 
-/* ===== USERNAME ===== */
 .name {
   position: absolute;
   top: -14px;
@@ -54,17 +50,13 @@ html, body {
 
 <script>
 /* ===============================
-   CONFIG (CALM & CLEAN)
+   CONFIG
 ================================ */
 const GRAVITY = 0.6;
 const WANDER_FORCE = 0.0006;
 const DESPAWN_TIME = 2 * 60 * 1000; // 2 minutes
 
-/* ===============================
-   MATTER SETUP
-================================ */
 const { Engine, Runner, Bodies, World, Events, Body } = Matter;
-
 const engine = Engine.create();
 engine.world.gravity.y = GRAVITY;
 
@@ -88,8 +80,6 @@ const SPRITES = [
   'sprites/goku.gif',
   'sprites/naruto.gif',
   'sprites/sasuke.gif',
-
-  // new sprites
   'sprites/arm.gif',
   'sprites/cboy.gif',
   'sprites/iron.gif',
@@ -111,14 +101,14 @@ function spawnOrUpdate(username, message = '') {
   if (!body) {
     body = Bodies.rectangle(
       Math.random() * width,
-      -80,                 // simple drop from above
+      -80,
       32,
       48,
       {
         friction: 0.3,
         frictionAir: 0.05,
         restitution: 0,
-        collisionFilter: { group: -1 }, // pass through others
+        collisionFilter: { group: -1 },
         render: { visible: false }
       }
     );
@@ -138,7 +128,6 @@ function spawnOrUpdate(username, message = '') {
     `;
 
     document.body.appendChild(el);
-
     body.plugin.el = el;
     characters.set(username, body);
     World.add(engine.world, body);
@@ -153,17 +142,10 @@ function spawnOrUpdate(username, message = '') {
 ================================ */
 function handleCommand(body, msg) {
   msg = msg.toLowerCase();
-
-  if (msg.includes('!jump')) {
-    Body.applyForce(body, body.position, { x: 0, y: -0.02 });
-  }
-
+  if (msg.includes('!jump')) Body.applyForce(body, body.position, { x: 0, y: -0.02 });
   if (msg.includes('!left')) body.plugin.dir = -1;
   if (msg.includes('!right')) body.plugin.dir = 1;
-
-  if (msg.includes('!bye')) {
-    removeCharacter(body);
-  }
+  if (msg.includes('!bye')) removeCharacter(body);
 }
 
 /* ===============================
@@ -171,23 +153,14 @@ function handleCommand(body, msg) {
 ================================ */
 Events.on(engine, 'beforeUpdate', () => {
   const now = performance.now();
-
   characters.forEach(body => {
     const p = body.plugin;
-
     if (now > p.nextChange) {
       p.dir = Math.random() > 0.5 ? 1 : -1;
       p.nextChange = now + rand(4000, 8000);
     }
-
-    Body.applyForce(body, body.position, {
-      x: p.dir * WANDER_FORCE,
-      y: 0
-    });
-
-    if (now - p.lastActive > DESPAWN_TIME) {
-      removeCharacter(body);
-    }
+    Body.applyForce(body, body.position, { x: p.dir * WANDER_FORCE, y: 0 });
+    if (now - p.lastActive > DESPAWN_TIME) removeCharacter(body);
   });
 });
 
@@ -197,16 +170,10 @@ Events.on(engine, 'beforeUpdate', () => {
 Events.on(engine, 'afterUpdate', () => {
   characters.forEach(body => {
     const el = body.plugin.el;
-
     el.style.left = body.position.x + 'px';
     el.style.top = body.position.y + 'px';
-
-    // flip sprite ONLY, never the username
-    if (body.plugin.dir === -1) {
-      el.classList.add('flip');
-    } else {
-      el.classList.remove('flip');
-    }
+    if (body.plugin.dir === -1) el.classList.add('flip'); 
+    else el.classList.remove('flip');
   });
 });
 
@@ -219,24 +186,55 @@ function removeCharacter(body) {
   characters.delete(body.plugin.username);
 }
 
-/* ===============================
-   DEMO (REPLACE WITH YT CHAT)
-================================ */
-const demoUsers = ['Dev', 'Alpha', 'Beta', 'Gamma', 'Delta'];
-const demoCmds = ['', '', '!jump', '!left', '!right'];
-
-setInterval(() => {
-  const u = demoUsers[Math.floor(Math.random() * demoUsers.length)];
-  const m = demoCmds[Math.floor(Math.random() * demoCmds.length)];
-  spawnOrUpdate(u, m);
-}, 3000);
-
 function rand(min, max) {
   return Math.random() * (max - min) + min;
 }
 
 Runner.run(Runner.create(), engine);
-</script>
 
+/* ===============================
+   YOUTUBE CHAT INTEGRATION
+================================ */
+const API_KEY = 'AIzaSyDHwlSUcaFUCD9A38zBwFsNc3sMsOZs-2g';
+const VIDEO_ID = 'OSg_cAc59Y4';
+let nextPageToken = '';
+
+async function fetchChat() {
+  try {
+    // Get live chat ID if not already
+    if (!window.liveChatId) {
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=liveStreamingDetails&id=${VIDEO_ID}&key=${API_KEY}`);
+      const data = await res.json();
+      window.liveChatId = data.items[0].liveStreamingDetails.activeLiveChatId;
+      if (!window.liveChatId) {
+        console.error('No live chat found for this video');
+        setTimeout(fetchChat, 5000);
+        return;
+      }
+    }
+
+    const url = `https://www.googleapis.com/youtube/v3/liveChat/messages?liveChatId=${window.liveChatId}&part=snippet,authorDetails&pageToken=${nextPageToken}&key=${API_KEY}`;
+    const chatRes = await fetch(url);
+    const chatData = await chatRes.json();
+
+    nextPageToken = chatData.nextPageToken || '';
+    if (chatData.items) {
+      chatData.items.forEach(item => {
+        const username = item.authorDetails.displayName;
+        const message = item.snippet.displayMessage;
+        spawnOrUpdate(username, message);
+      });
+    }
+
+    setTimeout(fetchChat, 1500); // Poll chat every 1.5 seconds
+
+  } catch (err) {
+    console.error('YT chat error:', err);
+    setTimeout(fetchChat, 5000);
+  }
+}
+
+fetchChat();
+</script>
 </body>
 </html>
